@@ -29,6 +29,9 @@ env/
 # IDE
 .idea/
 .vscode/
+
+# Keep .streamlit config for deployment
+!.streamlit/
 *.swp
 *.swo
 *~
