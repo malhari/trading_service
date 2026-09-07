@@ -1,0 +1,159 @@
+/* Trading Dashboard Custom Styles - Dark Theme */
+
+/* Main container */
+.main {
+    background-color: #0e1117;
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background-color: #1a1d24;
+}
+
+/* Cards */
+.stMetric {
+    background-color: #1a1d24;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #2d3139;
+}
+
+/* Positive P&L */
+.positive-pnl {
+    color: #00c853 !important;
+}
+
+/* Negative P&L */
+.negative-pnl {
+    color: #ff5252 !important;
+}
+
+/* Signal cards */
+.signal-card {
+    background-color: #1a1d24;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    border-left: 4px solid #2196f3;
+}
+
+.signal-card.bullish {
+    border-left-color: #00c853;
+}
+
+.signal-card.bearish {
+    border-left-color: #ff5252;
+}
+
+/* Watchlist item */
+.watchlist-item {
+    padding: 0.5rem;
+    border-bottom: 1px solid #2d3139;
+    cursor: pointer;
+}
+
+.watchlist-item:hover {
+    background-color: #2d3139;
+}
+
+/* Trend indicators */
+.trend-up {
+    color: #00c853;
+    font-weight: bold;
+}
+
+.trend-down {
+    color: #ff5252;
+    font-weight: bold;
+}
+
+.trend-sideways {
+    color: #ffc107;
+    font-weight: bold;
+}
+
+/* Order panel */
+.order-panel {
+    background-color: #1a1d24;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #2d3139;
+}
+
+/* Buy button */
+.buy-button {
+    background-color: #00c853 !important;
+    color: white !important;
+}
+
+/* Sell button */
+.sell-button {
+    background-color: #ff5252 !important;
+    color: white !important;
+}
+
+/* Risk gauge */
+.risk-low {
+    color: #00c853;
+}
+
+.risk-medium {
+    color: #ffc107;
+}
+
+.risk-high {
+    color: #ff5252;
+}
+
+/* Position table */
+.position-row {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #2d3139;
+}
+
+/* Circuit breaker warning */
+.circuit-breaker {
+    background-color: #ff5252;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    text-align: center;
+    font-weight: bold;
+}
+
+/* Mode indicator */
+.mode-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: bold;
+}
+
+.mode-paper {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.mode-live {
+    background-color: #ff5252;
+    color: white;
+}
+
+/* Tabs styling */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px;
+}
+
+.stTabs [data-baseweb="tab"] {
+    background-color: #1a1d24;
+    border-radius: 4px;
+}
+
+/* Dataframe styling */
+.dataframe {
+    font-size: 0.875rem;
+}
+
+/* Hide Streamlit branding */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
