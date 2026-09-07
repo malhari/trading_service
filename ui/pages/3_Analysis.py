@@ -301,6 +301,7 @@ def render_performance_analysis():
 def render_backtesting():
     """Render backtesting interface."""
     import plotly.graph_objects as go
+    import pandas as pd
     
     st.subheader("Backtest Configuration")
     
@@ -431,7 +432,6 @@ def render_backtesting():
             st.subheader("Monthly Returns")
             
             # Use 'ME' for pandas 2.2+ or 'M' for older versions
-            import pandas as pd
             pd_version = tuple(int(x) for x in pd.__version__.split('.')[:2])
             month_freq = 'ME' if pd_version >= (2, 2) else 'M'
             months = pd.date_range(start=start_date, end=end_date, freq=month_freq)
