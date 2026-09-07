@@ -28,6 +28,6 @@ structlog>=24.0.0
 
 # Streamlit UI
 streamlit>=1.28.0
-streamlit-lightweight-charts>=0.9.0
+streamlit-lightweight-charts>=0.7.15
 streamlit-autorefresh>=1.0.0
 plotly>=5.18.0
