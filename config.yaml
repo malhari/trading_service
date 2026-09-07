@@ -79,12 +79,36 @@ swing_risk:
   max_sector_exposure: 0.30    # Max 30% in one sector
 
 # LLM configuration
+# Supported providers: openai, ollama, llamacpp, lmstudio
 llm:
   enabled: true
-  provider: openai
-  model: gpt-4o-mini
+  provider: ollama           # Use local Ollama
+  model: llama3.2            # Model name in Ollama
+  base_url: http://localhost:11434  # Ollama default port
   validate_all_trades: false
   sentiment_check: false
+
+# Alternative LLM configurations (uncomment to use):
+#
+# OpenAI:
+# llm:
+#   enabled: true
+#   provider: openai
+#   model: gpt-4o-mini
+#
+# LM Studio:
+# llm:
+#   enabled: true
+#   provider: lmstudio
+#   model: local-model
+#   base_url: http://localhost:1234
+#
+# llama.cpp server:
+# llm:
+#   enabled: true
+#   provider: llamacpp
+#   model: llama3
+#   base_url: http://localhost:8080
 
 # Watchlist - symbols to monitor
 watchlist:

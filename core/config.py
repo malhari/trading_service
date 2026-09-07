@@ -101,10 +101,18 @@ class SwingRiskConfig(BaseModel):
 
 
 class LLMConfig(BaseModel):
-    """LLM configuration."""
+    """LLM configuration.
+    
+    Supported providers:
+    - openai: OpenAI API (requires OPENAI_API_KEY)
+    - ollama: Local Ollama server (default: http://localhost:11434)
+    - llamacpp: Local llama.cpp server (default: http://localhost:8080)
+    - lmstudio: LM Studio (default: http://localhost:1234)
+    """
     enabled: bool = True
-    provider: str = "openai"
-    model: str = "gpt-4o-mini"
+    provider: str = "openai"  # openai, ollama, llamacpp, lmstudio
+    model: str = "gpt-4o-mini"  # or llama3.2, mistral, etc. for local
+    base_url: Optional[str] = None  # Override default URL for local providers
     validate_all_trades: bool = False  # If True, LLM validates every trade
     sentiment_check: bool = False
 

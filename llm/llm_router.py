@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import requests
 from typing import Any, Dict, Optional
 
 from core.config import get_config
@@ -11,30 +12,30 @@ logger = logging.getLogger(__name__)
 
 
 class LLMRouter:
-    """Routes LLM requests and parses responses."""
+    """Routes LLM requests and parses responses.
+    
+    Supports multiple providers:
+    - openai: OpenAI API (GPT models)
+    - ollama: Local Ollama server (Llama, Mistral, etc.)
+    - llamacpp: Local llama.cpp server
+    - lmstudio: LM Studio local server
+    """
     
     def __init__(self):
         self.config = get_config()
         self._client = None
+        self._provider = self.config.llm.provider.lower()
     
     def _get_client(self):
         """Lazy load the LLM client."""
         if self._client is None and self.config.llm.enabled:
             try:
-                if self.config.llm.provider == "openai":
-                    from langchain_openai import ChatOpenAI
-                    
-                    api_key = os.getenv("OPENAI_API_KEY")
-                    if not api_key:
-                        logger.warning("OPENAI_API_KEY not set, LLM features disabled")
-                        return None
-                    
-                    self._client = ChatOpenAI(
-                        model=self.config.llm.model,
-                        temperature=0,
-                        api_key=api_key
-                    )
-                    logger.info(f"LLM client initialized: {self.config.llm.model}")
+                if self._provider == "openai":
+                    self._client = self._init_openai()
+                elif self._provider in ["ollama", "llamacpp", "lmstudio"]:
+                    self._client = self._init_local_llm()
+                else:
+                    logger.warning(f"Unknown LLM provider: {self._provider}")
                     
             except ImportError as e:
                 logger.warning(f"LLM dependencies not installed: {e}")
@@ -42,6 +43,118 @@ class LLMRouter:
                 logger.error(f"Failed to initialize LLM: {e}")
         
         return self._client
+    
+    def _init_openai(self):
+        """Initialize OpenAI client."""
+        from langchain_openai import ChatOpenAI
+        
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            logger.warning("OPENAI_API_KEY not set, LLM features disabled")
+            return None
+        
+        client = ChatOpenAI(
+            model=self.config.llm.model,
+            temperature=0,
+            api_key=api_key
+        )
+        logger.info(f"OpenAI client initialized: {self.config.llm.model}")
+        return client
+    
+    def _init_local_llm(self):
+        """Initialize local LLM client (Ollama, llama.cpp, LM Studio)."""
+        # Get base URL from config or environment
+        base_url = os.getenv("LLAMA_BASE_URL", self.config.llm.base_url or "http://localhost:11434")
+        model = os.getenv("LLAMA_MODEL", self.config.llm.model or "llama3.2")
+        
+        if self._provider == "ollama":
+            # Ollama uses /api/generate or /api/chat
+            try:
+                from langchain_ollama import ChatOllama
+                client = ChatOllama(
+                    model=model,
+                    base_url=base_url,
+                    temperature=0
+                )
+                logger.info(f"Ollama client initialized: {model} @ {base_url}")
+                return client
+            except ImportError:
+                # Fallback to direct API
+                logger.info(f"Using direct Ollama API: {model} @ {base_url}")
+                return {"type": "ollama_direct", "base_url": base_url, "model": model}
+        
+        elif self._provider == "llamacpp":
+            # llama.cpp server uses OpenAI-compatible API
+            base_url = os.getenv("LLAMA_BASE_URL", "http://localhost:8080")
+            try:
+                from langchain_openai import ChatOpenAI
+                client = ChatOpenAI(
+                    model=model,
+                    base_url=f"{base_url}/v1",
+                    api_key="not-needed",
+                    temperature=0
+                )
+                logger.info(f"llama.cpp client initialized: {model} @ {base_url}")
+                return client
+            except ImportError:
+                return {"type": "llamacpp_direct", "base_url": base_url, "model": model}
+        
+        elif self._provider == "lmstudio":
+            # LM Studio uses OpenAI-compatible API
+            base_url = os.getenv("LLAMA_BASE_URL", "http://localhost:1234")
+            try:
+                from langchain_openai import ChatOpenAI
+                client = ChatOpenAI(
+                    model=model,
+                    base_url=f"{base_url}/v1",
+                    api_key="not-needed",
+                    temperature=0
+                )
+                logger.info(f"LM Studio client initialized: {model} @ {base_url}")
+                return client
+            except ImportError:
+                return {"type": "lmstudio_direct", "base_url": base_url, "model": model}
+        
+        return None
+    
+    def _call_ollama_direct(self, prompt: str, client_config: dict) -> str:
+        """Direct API call to Ollama."""
+        url = f"{client_config['base_url']}/api/generate"
+        
+        payload = {
+            "model": client_config['model'],
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0
+            }
+        }
+        
+        try:
+            response = requests.post(url, json=payload, timeout=60)
+            response.raise_for_status()
+            return response.json().get("response", "")
+        except Exception as e:
+            logger.error(f"Ollama API error: {e}")
+            raise
+    
+    def _call_openai_compatible_direct(self, prompt: str, client_config: dict) -> str:
+        """Direct API call to OpenAI-compatible server (llama.cpp, LM Studio)."""
+        url = f"{client_config['base_url']}/v1/chat/completions"
+        
+        payload = {
+            "model": client_config['model'],
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0
+        }
+        
+        try:
+            response = requests.post(url, json=payload, timeout=60)
+            response.raise_for_status()
+            return response.json()["choices"][0]["message"]["content"]
+        except Exception as e:
+            logger.error(f"LLM API error: {e}")
+            raise
     
     def run(self, prompt: str) -> Dict[str, Any]:
         """
@@ -61,8 +174,16 @@ class LLMRouter:
             return {"allow_trade": True, "reason": "LLM not available"}
         
         try:
-            response = client.invoke(prompt)
-            content = response.content
+            # Handle direct API clients (dict config)
+            if isinstance(client, dict):
+                if client["type"] == "ollama_direct":
+                    content = self._call_ollama_direct(prompt, client)
+                else:
+                    content = self._call_openai_compatible_direct(prompt, client)
+            else:
+                # LangChain client
+                response = client.invoke(prompt)
+                content = response.content
             
             # Try to parse JSON from response
             result = self._parse_json_response(content)
