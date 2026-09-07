@@ -430,7 +430,11 @@ def render_backtesting():
             # Monthly returns
             st.subheader("Monthly Returns")
             
-            months = pd.date_range(start=start_date, end=end_date, freq='M')
+            # Use 'ME' for pandas 2.2+ or 'M' for older versions
+            try:
+                months = pd.date_range(start=start_date, end=end_date, freq='ME')
+            except ValueError:
+                months = pd.date_range(start=start_date, end=end_date, freq='M')
             monthly_returns = np.random.uniform(-0.05, 0.10, len(months))
             
             fig = go.Figure(data=[go.Bar(
