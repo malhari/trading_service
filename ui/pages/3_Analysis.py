@@ -431,10 +431,10 @@ def render_backtesting():
             st.subheader("Monthly Returns")
             
             # Use 'ME' for pandas 2.2+ or 'M' for older versions
-            try:
-                months = pd.date_range(start=start_date, end=end_date, freq='ME')
-            except ValueError:
-                months = pd.date_range(start=start_date, end=end_date, freq='M')
+            import pandas as pd
+            pd_version = tuple(int(x) for x in pd.__version__.split('.')[:2])
+            month_freq = 'ME' if pd_version >= (2, 2) else 'M'
+            months = pd.date_range(start=start_date, end=end_date, freq=month_freq)
             monthly_returns = np.random.uniform(-0.05, 0.10, len(months))
             
             fig = go.Figure(data=[go.Bar(
