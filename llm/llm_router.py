@@ -209,7 +209,12 @@ class LLMRouter:
             return {"allow_trade": True, "reason": f"LLM error: {e}"}
     
     def _parse_json_response(self, content: str) -> Dict[str, Any]:
-        """Parse JSON from LLM response."""
+        """Parse JSON from LLM response with robust handling."""
+        if not content or not content.strip():
+            return {"allow_trade": True, "reason": "Empty LLM response"}
+        
+        content = content.strip()
+        
         # Try direct JSON parse
         try:
             return json.loads(content)
@@ -217,27 +222,58 @@ class LLMRouter:
             pass
         
         # Try to extract JSON from markdown code block
-        if "```json" in content:
-            start = content.find("```json") + 7
-            end = content.find("```", start)
-            if end > start:
-                try:
-                    return json.loads(content[start:end].strip())
-                except json.JSONDecodeError:
-                    pass
+        for marker in ["```json", "```JSON", "```"]:
+            if marker in content:
+                start = content.find(marker) + len(marker)
+                end = content.find("```", start)
+                if end > start:
+                    try:
+                        return json.loads(content[start:end].strip())
+                    except json.JSONDecodeError:
+                        pass
         
-        # Try to find JSON object in text
+        # Try to find JSON object in text (handle nested braces)
         start = content.find("{")
-        end = content.rfind("}") + 1
-        if start >= 0 and end > start:
-            try:
-                return json.loads(content[start:end])
-            except json.JSONDecodeError:
-                pass
+        if start >= 0:
+            # Find matching closing brace
+            brace_count = 0
+            for i, char in enumerate(content[start:], start):
+                if char == "{":
+                    brace_count += 1
+                elif char == "}":
+                    brace_count -= 1
+                    if brace_count == 0:
+                        try:
+                            return json.loads(content[start:i+1])
+                        except json.JSONDecodeError:
+                            pass
+                        break
         
-        # Default response
-        logger.warning(f"Could not parse LLM response: {content[:200]}")
-        return {"allow_trade": True, "reason": "Could not parse LLM response"}
+        # Try to extract key information from natural language
+        content_lower = content.lower()
+        
+        # Check for clear yes/no signals
+        if any(phrase in content_lower for phrase in ["yes, proceed", "allow trade", "take the trade", "good setup", "valid setup"]):
+            return {
+                "allow_trade": True,
+                "confidence": 0.7,
+                "reason": content[:200]
+            }
+        elif any(phrase in content_lower for phrase in ["do not trade", "avoid", "skip", "reject", "risky"]):
+            return {
+                "allow_trade": False,
+                "confidence": 0.7,
+                "reason": content[:200]
+            }
+        
+        # Default - allow trade with warning
+        logger.warning(f"Could not parse LLM response, returning raw text: {content[:100]}")
+        return {
+            "allow_trade": True, 
+            "confidence": 0.5,
+            "reason": content[:300] if len(content) <= 300 else content[:297] + "...",
+            "parse_warning": "Response was not in expected JSON format"
+        }
     
     def analyze_market_sentiment(self, symbol: str) -> Dict[str, Any]:
         """
@@ -297,7 +333,7 @@ class LLMRouter:
         reward = abs(target - entry)
         rr_ratio = reward / risk if risk > 0 else 0
         
-        prompt = f"""Validate this breakout trade setup:
+        prompt = f"""Validate this breakout trade setup and respond ONLY with valid JSON.
 
 Symbol: {symbol}
 Signal: {signal_type}
@@ -314,13 +350,10 @@ Evaluate:
 2. Is volume confirmation adequate?
 3. Any red flags in this setup?
 
-Respond with JSON:
-{{
-    "allow_trade": true | false,
-    "confidence": 0.0 to 1.0,
-    "reason": "explanation",
-    "suggestions": ["suggestion1", "suggestion2"]
-}}"""
+IMPORTANT: Respond with ONLY this JSON format, no other text:
+{{"allow_trade": true, "confidence": 0.8, "reason": "Your analysis here", "suggestions": ["suggestion1"]}}
+
+Use allow_trade: true if setup is valid, false if not. Confidence between 0.0 and 1.0."""
         
         result = self.run(prompt)
         
