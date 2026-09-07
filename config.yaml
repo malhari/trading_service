@@ -83,7 +83,7 @@ swing_risk:
 llm:
   enabled: true
   provider: ollama           # Use local Ollama
-  model: llama3.2            # Model name in Ollama
+  model: qwen3:8b         # Qwen3 8B model in Ollama
   base_url: http://localhost:11434  # Ollama default port
   validate_all_trades: false
   sentiment_check: false
