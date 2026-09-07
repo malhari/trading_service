@@ -299,163 +299,17 @@ def render_performance_analysis():
 
 
 def render_backtesting():
-    """Render backtesting interface."""
-    import plotly.graph_objects as go
-    import pandas as pd
+    """Render Streak-style backtesting interface."""
+    from ui.components.backtester import render_backtest_panel, render_rule_comparison
     
-    st.subheader("Backtest Configuration")
+    # Tabs for different backtesting modes
+    bt_tab1, bt_tab2 = st.tabs(["Single Strategy", "Compare Strategies"])
     
-    col1, col2, col3 = st.columns(3)
+    with bt_tab1:
+        render_backtest_panel()
     
-    with col1:
-        strategy = st.selectbox(
-            "Strategy",
-            options=["Breakout", "ORB", "Pullback", "Trend Following"],
-            key="bt_strategy"
-        )
-    
-    with col2:
-        timeframe = st.selectbox(
-            "Timeframe",
-            options=["5m", "15m", "1H", "Daily"],
-            key="bt_timeframe"
-        )
-    
-    with col3:
-        initial_capital = st.number_input(
-            "Initial Capital",
-            min_value=10000,
-            value=100000,
-            step=10000,
-            key="bt_capital"
-        )
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        risk_per_trade = st.slider(
-            "Risk per Trade (%)",
-            min_value=0.5,
-            max_value=3.0,
-            value=1.0,
-            step=0.25,
-            key="bt_risk"
-        )
-    
-    with col2:
-        rr_target = st.slider(
-            "R:R Target",
-            min_value=1.0,
-            max_value=4.0,
-            value=2.0,
-            step=0.5,
-            key="bt_rr"
-        )
-    
-    with col3:
-        max_positions = st.slider(
-            "Max Positions",
-            min_value=1,
-            max_value=10,
-            value=3,
-            key="bt_max_pos"
-        )
-    
-    if st.button("Run Backtest", type="primary"):
-        with st.spinner("Running backtest..."):
-            # Simulate backtest
-            import time
-            time.sleep(1)
-            
-            st.success("Backtest completed!")
-            
-            # Results
-            st.subheader("Backtest Results")
-            
-            # Metrics
-            col1, col2, col3, col4, col5, col6 = st.columns(6)
-            
-            with col1:
-                st.metric("Total Return", f"{np.random.uniform(10, 50):.1f}%")
-            
-            with col2:
-                st.metric("Sharpe Ratio", f"{np.random.uniform(0.8, 2.5):.2f}")
-            
-            with col3:
-                st.metric("Win Rate", f"{np.random.uniform(45, 65):.1f}%")
-            
-            with col4:
-                st.metric("Profit Factor", f"{np.random.uniform(1.2, 2.8):.2f}")
-            
-            with col5:
-                st.metric("Max Drawdown", f"{np.random.uniform(5, 20):.1f}%")
-            
-            with col6:
-                st.metric("Total Trades", np.random.randint(50, 200))
-            
-            st.divider()
-            
-            # Equity curve
-            st.subheader("Equity Curve")
-            
-            days = (end_date - start_date).days
-            dates = pd.date_range(start=start_date, end=end_date, freq='D')
-            equity = initial_capital + np.cumsum(np.random.normal(200, 400, len(dates)))
-            
-            fig = go.Figure()
-            
-            fig.add_trace(go.Scatter(
-                x=dates,
-                y=equity,
-                mode='lines',
-                name='Equity',
-                line=dict(color='#2196f3', width=2),
-                fill='tozeroy',
-                fillcolor='rgba(33, 150, 243, 0.1)'
-            ))
-            
-            fig.add_hline(y=initial_capital, line_dash="dash", line_color="white", annotation_text="Initial Capital")
-            
-            fig.update_layout(
-                paper_bgcolor='#0e1117',
-                plot_bgcolor='#0e1117',
-                font={'color': '#d1d4dc'},
-                height=400,
-                margin=dict(l=60, r=20, t=20, b=40),
-                xaxis=dict(gridcolor='#1a1d24'),
-                yaxis=dict(gridcolor='#1a1d24', tickprefix='Rs.')
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Monthly returns
-            st.subheader("Monthly Returns")
-            
-            # Use 'ME' for pandas 2.2+ or 'M' for older versions
-            pd_version = tuple(int(x) for x in pd.__version__.split('.')[:2])
-            month_freq = 'ME' if pd_version >= (2, 2) else 'M'
-            months = pd.date_range(start=start_date, end=end_date, freq=month_freq)
-            monthly_returns = np.random.uniform(-0.05, 0.10, len(months))
-            
-            fig = go.Figure(data=[go.Bar(
-                x=[m.strftime('%b %Y') for m in months],
-                y=monthly_returns,
-                marker_color=['#00c853' if r >= 0 else '#ff5252' for r in monthly_returns]
-            )])
-            
-            fig.add_hline(y=0, line_color="white")
-            
-            fig.update_layout(
-                paper_bgcolor='#0e1117',
-                plot_bgcolor='#0e1117',
-                font={'color': '#d1d4dc'},
-                height=300,
-                margin=dict(l=40, r=20, t=20, b=40),
-                xaxis=dict(gridcolor='#1a1d24'),
-                yaxis=dict(gridcolor='#1a1d24', tickformat='.1%')
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
+    with bt_tab2:
+        render_rule_comparison()
 
 
 def render_signal_analysis():
