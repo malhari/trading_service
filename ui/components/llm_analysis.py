@@ -17,7 +17,8 @@ def get_llm_analysis(
     entry: float,
     stop_loss: float,
     target: float,
-    volume_ratio: float = 1.0
+    volume_ratio: float = 1.0,
+    include_prompt: bool = True
 ) -> Dict:
     """
     Get LLM analysis for a trade setup.
@@ -29,6 +30,7 @@ def get_llm_analysis(
         stop_loss: Stop loss price.
         target: Target price.
         volume_ratio: Volume relative to average.
+        include_prompt: Whether to include the prompt in the result.
     
     Returns:
         LLM analysis result.
@@ -43,7 +45,8 @@ def get_llm_analysis(
         entry=entry,
         sl=stop_loss,
         target=target,
-        volume_ratio=volume_ratio
+        volume_ratio=volume_ratio,
+        return_prompt=include_prompt
     )
     
     return result
@@ -227,12 +230,13 @@ def render_analysis_result(analysis: Dict, analysis_time: datetime):
     confidence = analysis.get('confidence', 0.5)
     reason = analysis.get('reason', 'No analysis available')
     suggestions = analysis.get('suggestions', [])
+    prompt = analysis.get('_prompt', '')
     
     # Decision badge
     if allow_trade:
-        st.success("✅ TRADE APPROVED", icon="✅")
+        st.success("TRADE APPROVED", icon="✅")
     else:
-        st.error("❌ TRADE NOT RECOMMENDED", icon="❌")
+        st.error("TRADE NOT RECOMMENDED", icon="❌")
     
     # Confidence meter
     st.markdown("**Confidence**")
@@ -255,6 +259,11 @@ def render_analysis_result(analysis: Dict, analysis_time: datetime):
         st.markdown("**Suggestions**")
         for suggestion in suggestions:
             st.caption(f"• {suggestion}")
+    
+    # Show prompt in expander
+    if prompt:
+        with st.expander("View LLM Prompt", expanded=False):
+            st.code(prompt, language="text")
     
     # Timestamp
     st.caption(f"Analyzed at {analysis_time.strftime('%H:%M:%S')}")

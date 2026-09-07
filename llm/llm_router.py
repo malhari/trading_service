@@ -262,7 +262,8 @@ class LLMRouter:
         entry: float,
         sl: float,
         target: float,
-        volume_ratio: float
+        volume_ratio: float,
+        return_prompt: bool = False
     ) -> Dict[str, Any]:
         """
         Validate a trade setup with LLM.
@@ -274,6 +275,7 @@ class LLMRouter:
             sl: Stop loss price.
             target: Target price.
             volume_ratio: Volume relative to average.
+            return_prompt: If True, include the prompt in the response.
         
         Returns:
             Validation result.
@@ -282,34 +284,37 @@ class LLMRouter:
         reward = abs(target - entry)
         rr_ratio = reward / risk if risk > 0 else 0
         
-        prompt = f"""
-        Validate this breakout trade setup:
+        prompt = f"""Validate this breakout trade setup:
+
+Symbol: {symbol}
+Signal: {signal_type}
+Entry: Rs.{entry:.2f}
+Stop Loss: Rs.{sl:.2f}
+Target: Rs.{target:.2f}
+Risk: Rs.{risk:.2f}
+Reward: Rs.{reward:.2f}
+Risk-Reward Ratio: {rr_ratio:.2f}
+Volume Ratio: {volume_ratio:.2f}x average
+
+Evaluate:
+1. Is the risk-reward acceptable for intraday?
+2. Is volume confirmation adequate?
+3. Any red flags in this setup?
+
+Respond with JSON:
+{{
+    "allow_trade": true | false,
+    "confidence": 0.0 to 1.0,
+    "reason": "explanation",
+    "suggestions": ["suggestion1", "suggestion2"]
+}}"""
         
-        Symbol: {symbol}
-        Signal: {signal_type}
-        Entry: ₹{entry:.2f}
-        Stop Loss: ₹{sl:.2f}
-        Target: ₹{target:.2f}
-        Risk: ₹{risk:.2f}
-        Reward: ₹{reward:.2f}
-        Risk-Reward Ratio: {rr_ratio:.2f}
-        Volume Ratio: {volume_ratio:.2f}x average
+        result = self.run(prompt)
         
-        Evaluate:
-        1. Is the risk-reward acceptable for intraday?
-        2. Is volume confirmation adequate?
-        3. Any red flags in this setup?
+        if return_prompt:
+            result['_prompt'] = prompt
         
-        Respond with JSON:
-        {{
-            "allow_trade": true | false,
-            "confidence": 0.0 to 1.0,
-            "reason": "explanation",
-            "suggestions": ["suggestion1", "suggestion2"]
-        }}
-        """
-        
-        return self.run(prompt)
+        return result
 
 
 # Singleton instance
