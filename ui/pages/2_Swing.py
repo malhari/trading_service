@@ -133,6 +133,7 @@ from ui.components.signals import render_signals
 from ui.components.positions import render_positions, get_position_alerts
 from ui.components.orders import render_order_panel
 from ui.components.risk_dashboard import render_risk_dashboard, render_sector_exposure, render_pnl_chart
+from ui.components.llm_analysis import render_llm_analysis_panel, render_sentiment_panel
 
 # Position alerts
 alerts = get_position_alerts("swing")
@@ -263,13 +264,18 @@ with col1:
                 st.markdown("---")
 
 with col2:
-    tab1, tab2 = st.tabs(["Signals", "Order"])
+    tab1, tab2, tab3 = st.tabs(["Signals", "AI Analysis", "Order"])
     
     with tab1:
         st.subheader("Swing Signals")
         render_signals(mode="swing")
     
     with tab2:
+        # Show LLM analysis if a signal is selected
+        signal_to_analyze = st.session_state.get('analyze_signal')
+        render_llm_analysis_panel(signal=signal_to_analyze)
+    
+    with tab3:
         st.subheader("Place Order")
         render_order_panel(mode="swing")
 

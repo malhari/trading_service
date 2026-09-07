@@ -190,6 +190,9 @@ def render_signal_card(signal: dict, mode: str):
 
 def take_trade(signal: dict, mode: str):
     """Execute a trade from a signal."""
+    # Store signal for LLM analysis
+    st.session_state['analyze_signal'] = signal
+    
     st.session_state['pending_order'] = {
         'symbol': signal['symbol'],
         'side': 'BUY' if 'LONG' in signal['type'] or 'BUY' in signal['type'] else 'SELL',
@@ -200,7 +203,7 @@ def take_trade(signal: dict, mode: str):
         'mode': mode
     }
     
-    st.success(f"Order prepared for {signal['symbol']}. Go to Order Panel to execute.")
+    st.success(f"Order prepared for {signal['symbol']}. Check AI Analysis and Order Panel.")
     st.rerun()
 
 

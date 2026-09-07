@@ -135,6 +135,7 @@ from ui.components.signals import render_signals
 from ui.components.positions import render_positions, get_position_alerts
 from ui.components.orders import render_order_panel
 from ui.components.risk_dashboard import render_compact_risk_bar
+from ui.components.llm_analysis import render_llm_analysis_panel
 
 # Position alerts
 alerts = get_position_alerts("intraday")
@@ -164,14 +165,19 @@ with col3:
 
 st.divider()
 
-# Bottom row: Positions | Order Panel
-col1, col2 = st.columns([2, 1])
+# Bottom row: Positions | AI Analysis | Order Panel
+col1, col2, col3 = st.columns([2, 1, 1])
 
 with col1:
     st.subheader("Open Positions")
     render_positions(mode="intraday")
 
 with col2:
+    # Show LLM analysis if a signal is selected
+    signal_to_analyze = st.session_state.get('analyze_signal')
+    render_llm_analysis_panel(signal=signal_to_analyze)
+
+with col3:
     st.subheader("Quick Order")
     render_order_panel(mode="intraday")
 
