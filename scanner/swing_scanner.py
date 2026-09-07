@@ -13,12 +13,12 @@ from enum import Enum
 from typing import Optional
 import pandas as pd
 from datetime import datetime
-import structlog
+import logging
 
 from strategies.swing_levels import SwingLevelCalculator
 from scanner.equity_scanner import get_scanner
 
-logger = structlog.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class ScanType(str, Enum):
