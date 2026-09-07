@@ -319,7 +319,8 @@ with col2:
             scanner = get_swing_scanner()
             
             # Get watchlist symbols (use configured or default)
-            watchlist = config.swing.watchlist if config.swing.watchlist else [
+            # Get watchlist from config or use default
+            watchlist = config.swing_watchlist.symbols if config.swing_watchlist.symbols else [
                 "RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK",
                 "BHARTIARTL", "SBIN", "WIPRO", "TATASTEEL", "AXISBANK"
             ]
