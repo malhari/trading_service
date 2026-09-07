@@ -160,7 +160,7 @@ with col2:
     )
 
 with col3:
-    st.subheader("Analysis")
+    st.subheader("Technical Analysis")
     
     if st.session_state.selected_symbol:
         symbol = st.session_state.selected_symbol
@@ -206,6 +206,43 @@ with col3:
             if supports:
                 for i, s in enumerate(supports[:3], 1):
                     st.markdown(f"S{i}: {s.price:.2f} ({s.level_type})")
+            
+            st.divider()
+            
+            # Technical Indicators (RSI, MACD, EMA)
+            st.markdown("**Technical Indicators**")
+            indicators = calc.get_indicator_signals(df)
+            
+            if "error" not in indicators:
+                # RSI
+                rsi_val = indicators["rsi"]["value"]
+                rsi_sig = indicators["rsi"]["signal"]
+                rsi_color = "green" if rsi_sig in ["oversold", "recovering_from_oversold"] else \
+                            "red" if rsi_sig in ["overbought", "weakening_from_overbought"] else "gray"
+                st.markdown(f"**RSI (14):** :{rsi_color}[{rsi_val}] - {rsi_sig.replace('_', ' ').title()}")
+                
+                # MACD
+                macd_val = indicators["macd"]["macd"]
+                macd_hist = indicators["macd"]["histogram"]
+                macd_sig = indicators["macd"]["signal"]
+                macd_color = "green" if "bullish" in macd_sig else "red" if "bearish" in macd_sig else "gray"
+                crossover_icon = " 🔄" if indicators["macd"]["crossover"] else ""
+                st.markdown(f"**MACD:** :{macd_color}[{macd_val}]{crossover_icon} - {macd_sig.replace('_', ' ').title()}")
+                
+                # EMA
+                ema_21 = indicators["ema"]["ema_21"]
+                ema_50 = indicators["ema"]["ema_50"]
+                ema_sig = indicators["ema"]["signal"]
+                ema_color = "green" if "uptrend" in ema_sig else "red" if "downtrend" in ema_sig else "gray"
+                st.markdown(f"**EMA:** 21d={ema_21:.2f} | 50d={ema_50:.2f}")
+                st.markdown(f"**Trend:** :{ema_color}[{ema_sig.replace('_', ' ').title()}]")
+                
+                # Overall signal
+                st.divider()
+                overall = indicators["overall_signal"]
+                overall_color = "green" if overall == "bullish" else "red" if overall == "bearish" else "orange"
+                st.markdown(f"### Overall: :{overall_color}[{overall.upper()}]")
+                st.caption(f"Bullish signals: {indicators['bullish_count']} | Bearish signals: {indicators['bearish_count']}")
             
             st.divider()
             
@@ -264,18 +301,85 @@ with col1:
                 st.markdown("---")
 
 with col2:
-    tab1, tab2, tab3 = st.tabs(["Signals", "AI Analysis", "Order"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Scanner", "Signals", "AI Analysis", "Order"])
     
     with tab1:
+        st.subheader("Swing Scanner")
+        
+        # Scanner settings
+        scan_col1, scan_col2 = st.columns(2)
+        with scan_col1:
+            min_score = st.slider("Min Score", 40, 90, 60, 5)
+        with scan_col2:
+            scan_type = st.selectbox("Setup Type", ["All", "Bullish Only", "Bearish Only"])
+        
+        if st.button("🔍 Scan Watchlist", type="primary", use_container_width=True):
+            from scanner.swing_scanner import get_swing_scanner
+            
+            scanner = get_swing_scanner()
+            
+            # Get watchlist symbols (use configured or default)
+            watchlist = config.swing.watchlist if config.swing.watchlist else [
+                "RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK",
+                "BHARTIARTL", "SBIN", "WIPRO", "TATASTEEL", "AXISBANK"
+            ]
+            
+            with st.spinner("Scanning..."):
+                if scan_type == "Bullish Only":
+                    results = scanner.get_bullish_setups(watchlist)
+                elif scan_type == "Bearish Only":
+                    results = scanner.get_bearish_setups(watchlist)
+                else:
+                    results = scanner.scan_watchlist(watchlist, min_score=min_score)
+                
+                st.session_state.scan_results = results
+        
+        # Display scan results
+        if "scan_results" in st.session_state and st.session_state.scan_results:
+            results = st.session_state.scan_results
+            st.success(f"Found {len(results)} setups")
+            
+            for r in results:
+                with st.container(border=True):
+                    # Header with symbol and score
+                    score_color = "green" if r.score >= 75 else "orange" if r.score >= 60 else "gray"
+                    st.markdown(f"### {r.symbol} :{score_color}[{r.score:.0f}]")
+                    
+                    # Type and price
+                    type_emoji = "📈" if "bullish" in r.scan_type.value or "support" in r.scan_type.value or "oversold" in r.scan_type.value else "📉"
+                    st.markdown(f"{type_emoji} **{r.scan_type.value.replace('_', ' ').title()}**")
+                    st.markdown(f"Price: **Rs.{r.price:.2f}** | RSI: **{r.rsi:.1f}**")
+                    
+                    # Support/Resistance info
+                    if r.nearest_support:
+                        st.markdown(f"Support: Rs.{r.nearest_support:.2f} ({r.distance_to_support_pct:.1f}% away)")
+                    if r.nearest_resistance:
+                        st.markdown(f"Resistance: Rs.{r.nearest_resistance:.2f} ({r.distance_to_resistance_pct:.1f}% away)")
+                    
+                    # Volume
+                    vol_icon = "📊" if r.volume_ratio >= 1.2 else "📉"
+                    st.markdown(f"Volume: {vol_icon} {r.volume_ratio:.1f}x avg")
+                    
+                    # Recommendation
+                    st.info(r.recommendation, icon="💡")
+                    
+                    # Action button
+                    if st.button(f"Analyze {r.symbol}", key=f"scan_{r.symbol}"):
+                        st.session_state.selected_symbol = r.symbol
+                        st.rerun()
+        elif "scan_results" in st.session_state:
+            st.warning("No setups found matching criteria")
+    
+    with tab2:
         st.subheader("Swing Signals")
         render_signals(mode="swing")
     
-    with tab2:
+    with tab3:
         # Show LLM analysis if a signal is selected
         signal_to_analyze = st.session_state.get('analyze_signal')
         render_llm_analysis_panel(signal=signal_to_analyze)
     
-    with tab3:
+    with tab4:
         st.subheader("Place Order")
         render_order_panel(mode="swing")
 

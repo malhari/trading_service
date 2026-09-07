@@ -155,6 +155,171 @@ class SwingLevelCalculator(SRLevelCalculator):
         """Calculate Exponential Moving Average."""
         return df["close"].ewm(span=period, adjust=False).mean()
     
+    def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
+        """
+        Calculate Relative Strength Index (RSI).
+        
+        Args:
+            df: DataFrame with 'close' column.
+            period: RSI period (default 14).
+        
+        Returns:
+            RSI series (0-100).
+        """
+        delta = df["close"].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+        return rsi
+    
+    def calculate_macd(
+        self, 
+        df: pd.DataFrame, 
+        fast: int = 12, 
+        slow: int = 26, 
+        signal: int = 9
+    ) -> dict:
+        """
+        Calculate MACD (Moving Average Convergence Divergence).
+        
+        Args:
+            df: DataFrame with 'close' column.
+            fast: Fast EMA period (default 12).
+            slow: Slow EMA period (default 26).
+            signal: Signal line period (default 9).
+        
+        Returns:
+            Dict with 'macd', 'signal', 'histogram' series.
+        """
+        ema_fast = df["close"].ewm(span=fast, adjust=False).mean()
+        ema_slow = df["close"].ewm(span=slow, adjust=False).mean()
+        
+        macd_line = ema_fast - ema_slow
+        signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+        histogram = macd_line - signal_line
+        
+        return {
+            "macd": macd_line,
+            "signal": signal_line,
+            "histogram": histogram
+        }
+    
+    def get_indicator_signals(self, df: pd.DataFrame) -> dict:
+        """
+        Get trading signals from multiple indicators.
+        
+        Args:
+            df: Daily OHLC DataFrame.
+        
+        Returns:
+            Dict with indicator values and signals.
+        """
+        if len(df) < 50:
+            return {"error": "Insufficient data"}
+        
+        # Calculate indicators
+        rsi = self.calculate_rsi(df, 14)
+        macd = self.calculate_macd(df)
+        ema_21 = self.calculate_ema(df, 21)
+        ema_50 = self.calculate_ema(df, 50)
+        
+        current_price = df.iloc[-1]["close"]
+        current_rsi = rsi.iloc[-1]
+        prev_rsi = rsi.iloc[-2]
+        current_macd = macd["macd"].iloc[-1]
+        current_signal = macd["signal"].iloc[-1]
+        prev_macd = macd["macd"].iloc[-2]
+        prev_signal = macd["signal"].iloc[-2]
+        current_histogram = macd["histogram"].iloc[-1]
+        current_ema_21 = ema_21.iloc[-1]
+        current_ema_50 = ema_50.iloc[-1]
+        
+        # RSI signals
+        rsi_signal = "neutral"
+        if current_rsi < 30:
+            rsi_signal = "oversold"
+        elif current_rsi > 70:
+            rsi_signal = "overbought"
+        elif current_rsi < 40 and current_rsi > prev_rsi:
+            rsi_signal = "recovering_from_oversold"
+        elif current_rsi > 60 and current_rsi < prev_rsi:
+            rsi_signal = "weakening_from_overbought"
+        
+        # MACD signals
+        macd_signal = "neutral"
+        macd_crossover = False
+        if current_macd > current_signal and prev_macd <= prev_signal:
+            macd_signal = "bullish_crossover"
+            macd_crossover = True
+        elif current_macd < current_signal and prev_macd >= prev_signal:
+            macd_signal = "bearish_crossover"
+            macd_crossover = True
+        elif current_macd > current_signal:
+            macd_signal = "bullish"
+        elif current_macd < current_signal:
+            macd_signal = "bearish"
+        
+        # EMA signals
+        ema_signal = "neutral"
+        if current_price > current_ema_21 > current_ema_50:
+            ema_signal = "strong_uptrend"
+        elif current_price < current_ema_21 < current_ema_50:
+            ema_signal = "strong_downtrend"
+        elif current_ema_21 > current_ema_50:
+            ema_signal = "uptrend"
+        elif current_ema_21 < current_ema_50:
+            ema_signal = "downtrend"
+        
+        # Combined signal strength
+        bullish_count = 0
+        bearish_count = 0
+        
+        if rsi_signal in ["oversold", "recovering_from_oversold"]:
+            bullish_count += 1
+        elif rsi_signal in ["overbought", "weakening_from_overbought"]:
+            bearish_count += 1
+        
+        if macd_signal in ["bullish", "bullish_crossover"]:
+            bullish_count += 1
+        elif macd_signal in ["bearish", "bearish_crossover"]:
+            bearish_count += 1
+        
+        if ema_signal in ["uptrend", "strong_uptrend"]:
+            bullish_count += 1
+        elif ema_signal in ["downtrend", "strong_downtrend"]:
+            bearish_count += 1
+        
+        overall_signal = "neutral"
+        if bullish_count >= 2:
+            overall_signal = "bullish"
+        elif bearish_count >= 2:
+            overall_signal = "bearish"
+        
+        return {
+            "rsi": {
+                "value": round(current_rsi, 2),
+                "signal": rsi_signal
+            },
+            "macd": {
+                "macd": round(current_macd, 2),
+                "signal_line": round(current_signal, 2),
+                "histogram": round(current_histogram, 2),
+                "signal": macd_signal,
+                "crossover": macd_crossover
+            },
+            "ema": {
+                "ema_21": round(current_ema_21, 2),
+                "ema_50": round(current_ema_50, 2),
+                "signal": ema_signal
+            },
+            "price": round(current_price, 2),
+            "overall_signal": overall_signal,
+            "bullish_count": bullish_count,
+            "bearish_count": bearish_count
+        }
+    
     def analyze_trend(self, df: pd.DataFrame) -> TrendAnalysis:
         """
         Analyze the trend using EMAs and price structure.
