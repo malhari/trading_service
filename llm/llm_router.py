@@ -126,14 +126,22 @@ class LLMRouter:
             "prompt": prompt,
             "stream": False,
             "options": {
-                "temperature": 0
+                "temperature": 0,
+                "num_predict": 500  # Limit response length for faster generation
             }
         }
         
         try:
-            response = requests.post(url, json=payload, timeout=60)
+            # Increased timeout to 180 seconds for larger models
+            response = requests.post(url, json=payload, timeout=180)
             response.raise_for_status()
             return response.json().get("response", "")
+        except requests.exceptions.Timeout:
+            logger.error("Ollama request timed out. Model may still be loading or is too slow.")
+            raise Exception("LLM timeout - try again or use a smaller model")
+        except requests.exceptions.ConnectionError:
+            logger.error("Cannot connect to Ollama. Is it running?")
+            raise Exception("Cannot connect to Ollama at localhost:11434. Run 'ollama serve' first.")
         except Exception as e:
             logger.error(f"Ollama API error: {e}")
             raise
@@ -145,13 +153,18 @@ class LLMRouter:
         payload = {
             "model": client_config['model'],
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0
+            "temperature": 0,
+            "max_tokens": 500  # Limit response length
         }
         
         try:
-            response = requests.post(url, json=payload, timeout=60)
+            # Increased timeout to 180 seconds for larger models
+            response = requests.post(url, json=payload, timeout=180)
             response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"]
+        except requests.exceptions.Timeout:
+            logger.error("LLM request timed out")
+            raise Exception("LLM timeout - try again or use a smaller model")
         except Exception as e:
             logger.error(f"LLM API error: {e}")
             raise
