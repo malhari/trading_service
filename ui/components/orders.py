@@ -313,45 +313,34 @@ def execute_order(
             st.error(f"Risk check failed: {check.reason}")
             return
     
-    # Execute order (paper mode for now)
-    if config.mode == TradingMode.PAPER:
-        if mode == "intraday":
-            from core.position_tracker import get_order_manager, get_position_tracker
-            from core.models import OrderType as OT
-            
-            order_manager = get_order_manager()
-            position_tracker = get_position_tracker()
-            
-            order_id = order_manager.place_entry_order(signal, quantity, OT.MARKET)
-            
-            if order_id:
-                position_tracker.open_position(
-                    signal=signal,
-                    quantity=quantity,
-                    entry_order_id=order_id,
-                    entry_price=entry_price or signal.entry_price
-                )
-        else:
-            from core.swing_tracker import get_swing_order_manager, get_swing_position_tracker
-            
-            order_manager = get_swing_order_manager()
-            position_tracker = get_swing_position_tracker()
-            
-            order_id = order_manager.place_entry_order(signal, quantity)
-            
-            if order_id:
-                position_tracker.open_position(
-                    signal=signal,
-                    quantity=quantity,
-                    entry_order_id=order_id,
-                    entry_price=entry_price or signal.entry_price
-                )
-        
-        st.success(f"Order placed: {side} {quantity} {symbol}")
+    # Execute order using order service
+    from services.order_service import get_order_service
+    
+    order_service = get_order_service()
+    product = "MIS" if mode == "intraday" else "CNC"
+    
+    # Show mode indicator
+    if order_service.is_live:
+        st.warning("⚠️ LIVE MODE - Real order will be placed!")
+    
+    result = order_service.execute_signal(
+        symbol=symbol,
+        side=side,
+        entry_price=entry_price if entry_price > 0 else 0,
+        stop_loss=stop_loss,
+        target=target,
+        quantity=quantity,
+        product=product
+    )
+    
+    if result:
+        mode_text = "LIVE" if order_service.is_live else "PAPER"
+        st.success(f"✅ [{mode_text}] Order executed: {side} {result.quantity} {symbol} @ {entry_price:.2f}")
+        st.info(f"SL: {stop_loss:.2f} | Target: {target:.2f}")
         clear_order_form()
         st.rerun()
     else:
-        st.warning("Live trading requires Kite Connect authentication")
+        st.error("❌ Order execution failed")
 
 
 def render_modify_sl_form(modify_sl: dict, mode: str):

@@ -14,55 +14,60 @@ from core.models import OrderSide
 
 
 def get_intraday_positions() -> List[dict]:
-    """Get current intraday positions."""
-    from core.position_tracker import get_position_tracker
+    """Get current intraday positions from order service."""
+    # First try order service (actual executed orders)
+    from services.order_service import get_order_service
     
-    tracker = get_position_tracker()
-    positions = tracker.get_all_positions()
+    order_service = get_order_service()
+    service_positions = order_service.get_positions()
     
     result = []
-    for pos in positions:
-        result.append({
-            'symbol': pos.symbol,
-            'side': pos.side.value,
-            'quantity': pos.quantity,
-            'entry_price': pos.entry_price,
-            'current_price': pos.current_price,
-            'stop_loss': pos.stop_loss,
-            'target': pos.target,
-            'pnl': pos.pnl,
-            'pnl_percent': pos.pnl_percent,
-            'entry_time': pos.entry_time,
-            'sl_at_be': pos.is_sl_at_breakeven
-        })
     
-    # Add sample positions for demo if empty
-    if not result:
-        import numpy as np
+    # Convert service positions
+    for pos in service_positions:
+        if pos.get('status') == 'open':
+            result.append({
+                'symbol': pos['symbol'],
+                'side': pos['side'],
+                'quantity': pos['quantity'],
+                'entry_price': pos['entry_price'],
+                'current_price': pos.get('current_price', pos['entry_price']),
+                'stop_loss': pos.get('stop_loss', pos['entry_price'] * 0.98),
+                'target': pos.get('target', pos['entry_price'] * 1.04),
+                'pnl': pos.get('pnl', 0),
+                'pnl_percent': (pos.get('pnl', 0) / (pos['entry_price'] * pos['quantity']) * 100) if pos['entry_price'] > 0 else 0,
+                'entry_time': datetime.now(),
+                'sl_at_be': False,
+                'source': 'order_service'
+            })
+    
+    # Also get from old position tracker
+    try:
+        from core.position_tracker import get_position_tracker
+        tracker = get_position_tracker()
+        positions = tracker.get_all_positions()
         
-        sample_positions = [
-            {'symbol': 'RELIANCE', 'side': 'BUY', 'quantity': 10},
-            {'symbol': 'TCS', 'side': 'SELL', 'quantity': 5},
-        ]
-        
-        for sp in sample_positions:
-            if np.random.random() > 0.5:  # 50% chance to show
-                entry = np.random.uniform(2000, 3000)
-                current = entry * (1 + np.random.uniform(-0.02, 0.03))
-                
-                result.append({
-                    'symbol': sp['symbol'],
-                    'side': sp['side'],
-                    'quantity': sp['quantity'],
-                    'entry_price': entry,
-                    'current_price': current,
-                    'stop_loss': entry * 0.98 if sp['side'] == 'BUY' else entry * 1.02,
-                    'target': entry * 1.04 if sp['side'] == 'BUY' else entry * 0.96,
-                    'pnl': (current - entry) * sp['quantity'] if sp['side'] == 'BUY' else (entry - current) * sp['quantity'],
-                    'pnl_percent': ((current - entry) / entry) * 100 if sp['side'] == 'BUY' else ((entry - current) / entry) * 100,
-                    'entry_time': datetime.now(),
-                    'sl_at_be': False
-                })
+        for pos in positions:
+            # Skip if already in result
+            if any(r['symbol'] == pos.symbol and r.get('source') == 'order_service' for r in result):
+                continue
+            
+            result.append({
+                'symbol': pos.symbol,
+                'side': pos.side.value,
+                'quantity': pos.quantity,
+                'entry_price': pos.entry_price,
+                'current_price': pos.current_price,
+                'stop_loss': pos.stop_loss,
+                'target': pos.target,
+                'pnl': pos.pnl,
+                'pnl_percent': pos.pnl_percent,
+                'entry_time': pos.entry_time,
+                'sl_at_be': pos.is_sl_at_breakeven,
+                'source': 'tracker'
+            })
+    except Exception:
+        pass
     
     return result
 

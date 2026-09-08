@@ -176,14 +176,62 @@ def render_signal_card(signal: dict, mode: str):
             else:
                 st.caption(f"Vol: {signal.get('volume_ratio', 1.0):.1f}x")
         
-        # Take trade button
-        if st.button(
-            "Take Trade",
-            key=f"take_{symbol}_{signal_type}_{mode}",
-            use_container_width=True,
-            type="primary"
-        ):
-            take_trade(signal, mode)
+        # Action buttons
+        btn_col1, btn_col2 = st.columns(2)
+        
+        with btn_col1:
+            if st.button(
+                "📋 Prepare",
+                key=f"prepare_{symbol}_{signal_type}_{mode}",
+                use_container_width=True
+            ):
+                take_trade(signal, mode)
+        
+        with btn_col2:
+            if st.button(
+                "⚡ Execute",
+                key=f"execute_{symbol}_{signal_type}_{mode}",
+                use_container_width=True,
+                type="primary"
+            ):
+                # Show execution dialog
+                st.session_state[f'show_exec_{symbol}'] = signal
+                st.rerun()
+        
+        # Execution dialog
+        if st.session_state.get(f'show_exec_{symbol}'):
+            exec_signal = st.session_state[f'show_exec_{symbol}']
+            with st.expander("⚡ Quick Execute", expanded=True):
+                risk_amt = st.number_input(
+                    "Risk Amount (Rs.)",
+                    min_value=100,
+                    max_value=10000,
+                    value=1000,
+                    step=100,
+                    key=f"risk_{symbol}_{mode}"
+                )
+                
+                # Calculate quantity preview
+                risk_per_share = abs(exec_signal['entry'] - exec_signal['stop_loss'])
+                est_qty = int(risk_amt / risk_per_share) if risk_per_share > 0 else 0
+                st.caption(f"Est. Quantity: {est_qty} shares")
+                
+                from services.order_service import get_order_service
+                order_service = get_order_service()
+                mode_text = "PAPER" if not order_service.is_live else "🔴 LIVE"
+                st.caption(f"Mode: {mode_text}")
+                
+                exec_col1, exec_col2 = st.columns(2)
+                with exec_col1:
+                    if st.button("✅ Confirm", key=f"confirm_{symbol}", type="primary"):
+                        if execute_order_now(exec_signal, mode, quantity=0, risk_amount=risk_amt):
+                            del st.session_state[f'show_exec_{symbol}']
+                            st.rerun()
+                
+                with exec_col2:
+                    if st.button("❌ Cancel", key=f"cancel_{symbol}"):
+                        del st.session_state[f'show_exec_{symbol}']
+                        st.rerun()
         
         st.markdown("---")
 
@@ -203,8 +251,46 @@ def take_trade(signal: dict, mode: str):
         'mode': mode
     }
     
-    st.success(f"Order prepared for {signal['symbol']}. Check AI Analysis and Order Panel.")
+    st.info(f"Order prepared for {signal['symbol']}. Go to Order Panel to execute.")
     st.rerun()
+
+
+def execute_order_now(signal: dict, mode: str, quantity: int = 0, risk_amount: float = 1000):
+    """
+    Execute order immediately using the order service.
+    
+    Args:
+        signal: Signal data with entry, sl, target
+        mode: Trading mode (intraday/swing)
+        quantity: Number of shares (0 = calculate from risk)
+        risk_amount: Risk amount in Rs if quantity is 0
+    """
+    from services.order_service import get_order_service
+    
+    order_service = get_order_service()
+    
+    side = 'BUY' if 'LONG' in signal['type'] or 'BUY' in signal['type'] else 'SELL'
+    product = "MIS" if mode == "intraday" else "CNC"
+    target = signal.get('target_1', signal.get('target', 0))
+    
+    result = order_service.execute_signal(
+        symbol=signal['symbol'],
+        side=side,
+        entry_price=signal['entry'],
+        stop_loss=signal['stop_loss'],
+        target=target,
+        quantity=quantity,
+        risk_amount=risk_amount,
+        product=product
+    )
+    
+    if result:
+        st.success(f"✅ Order executed: {side} {result.quantity} {signal['symbol']} @ {signal['entry']:.2f}")
+        st.info(f"SL: {signal['stop_loss']:.2f} | Target: {target:.2f}")
+        return True
+    else:
+        st.error("❌ Order execution failed")
+        return False
 
 
 def render_signal_history(mode: str = "intraday", limit: int = 10):
